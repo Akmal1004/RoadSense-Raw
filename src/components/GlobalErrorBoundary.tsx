@@ -22,7 +22,11 @@ export default class GlobalErrorBoundary extends Component<PropsWithChildren, St
       return (
         <View style={styles.root}>
           <Text style={styles.title}>Something went wrong</Text>
-          <Text style={styles.message}>RoadSense recovered from an app error. Restart the screen and try again.</Text>
+          <Text style={styles.message}>RoadSense recovered from an app error:</Text>
+          <Text style={styles.errorText}>{this.state.error.toString()}</Text>
+          {this.state.error.stack ? (
+            <Text style={styles.stackText}>{this.state.error.stack.slice(0, 300)}</Text>
+          ) : null}
           <GradientButton label="Try Again" icon="refresh" onPress={() => this.setState({ error: null })} />
         </View>
       );
@@ -51,7 +55,22 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
     fontSize: 15,
     lineHeight: 22,
-    marginBottom: 20,
+    marginBottom: 10,
     textAlign: "center"
+  },
+  errorText: {
+    color: "#EF4444",
+    fontSize: 14,
+    fontWeight: "bold",
+    marginBottom: 10,
+    textAlign: "center",
+    paddingHorizontal: 16
+  },
+  stackText: {
+    color: "#64748B",
+    fontSize: 11,
+    marginBottom: 20,
+    textAlign: "center",
+    paddingHorizontal: 16
   }
 });

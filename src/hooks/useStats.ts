@@ -1,18 +1,24 @@
 import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { defaultTripStats, LocalTripStats, storageService } from "../services/storageService";
+import { useAuth } from "../context/AuthContext";
 
 export function useStats() {
+  const { user } = useAuth();
   const [stats, setStats] = useState<LocalTripStats>(defaultTripStats);
 
+  const fetchStats = useCallback(() => {
+    storageService.getTripStats(user?.id).then(setStats);
+  }, [user?.id]);
+
   useEffect(() => {
-    storageService.getTripStats().then(setStats);
-  }, []);
+    fetchStats();
+  }, [fetchStats]);
 
   useFocusEffect(
     useCallback(() => {
-      storageService.getTripStats().then(setStats);
-    }, [])
+      fetchStats();
+    }, [fetchStats])
   );
 
   return {

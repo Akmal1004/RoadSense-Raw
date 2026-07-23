@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTheme } from "../theme/hooks/useTheme";
@@ -22,13 +23,30 @@ export default function SearchBar({
   onSubmit
 }: Props) {
   const { theme } = useTheme();
+  const [focused, setFocused] = useState(false);
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <MaterialCommunityIcons name="magnify" size={22} color={theme.textSecondary} />
+    <View
+      style={[
+        styles.root,
+        {
+          backgroundColor: theme.input,
+          borderColor: focused ? theme.primary : theme.border,
+          shadowColor: theme.primary
+        },
+        focused && styles.focusedGlow
+      ]}
+    >
+      <MaterialCommunityIcons
+        name="magnify"
+        size={22}
+        color={focused ? theme.primary : theme.textSecondary}
+      />
       <TextInput
         value={value}
         onChangeText={onChangeText}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         onSubmitEditing={onSubmit}
         placeholder={placeholder}
         placeholderTextColor={theme.textSecondary}
@@ -42,7 +60,7 @@ export default function SearchBar({
         </Pressable>
       ) : null}
       {onChooseOnMap ? (
-        <Pressable onPress={onChooseOnMap} style={[styles.iconButton, { backgroundColor: theme.chipBackground }]}>
+        <Pressable onPress={onChooseOnMap} style={[styles.iconButton, { backgroundColor: theme.chipBackground, borderColor: theme.chipBorder, borderWidth: 1 }]}>
           <MaterialCommunityIcons name="map-marker-plus-outline" size={19} color={theme.primary} />
         </Pressable>
       ) : null}
@@ -54,12 +72,18 @@ const styles = StyleSheet.create({
   root: {
     alignItems: "center",
     borderRadius: 22,
-    borderWidth: 1,
+    borderWidth: 1.5,
     flexDirection: "row",
     gap: 10,
     minHeight: 58,
-    paddingHorizontal: 14
+    paddingHorizontal: 14,
+    marginBottom: 12
+  },
+  focusedGlow: {
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14
   },
   input: { flex: 1, fontSize: 15, minHeight: 54 },
-  iconButton: { alignItems: "center", borderRadius: 14, height: 34, justifyContent: "center", width: 34 }
+  iconButton: { alignItems: "center", borderRadius: 14, height: 36, justifyContent: "center", width: 36 }
 });

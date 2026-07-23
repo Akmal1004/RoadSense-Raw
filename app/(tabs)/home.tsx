@@ -1,6 +1,7 @@
+import { useIsFocused } from "@react-navigation/native";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AIChip from "../../src/components/AIChip";
 import CategoryChips from "../../src/components/CategoryChips";
@@ -18,6 +19,7 @@ import StatCard from "../../src/components/StatCard";
 import { recentDestinations } from "../../src/constants/mockData";
 import { spacing } from "../../src/constants/theme";
 import { useAppState } from "../../src/context/AppStateContext";
+import { useAuth } from "../../src/context/AuthContext";
 import { useRoutes } from "../../src/hooks/useRoutes";
 import { useStats } from "../../src/hooks/useStats";
 import { useWeather } from "../../src/hooks/useWeather";
@@ -50,6 +52,7 @@ const favoriteFallbacks = ["Home", "Work", "College", "Airport"];
 
 export default function HomeScreen() {
   const { theme, isDark, toggleTheme } = useTheme();
+  const { user } = useAuth();
   const { routePlan, preferences: userPreferences } = useAppState();
   const [source, setSource] = useState("");
   const [destination, setDestination] = useState("");
@@ -94,9 +97,9 @@ export default function HomeScreen() {
   useEffect(() => () => cancelGeminiRequest("home-insights"), []);
 
   useEffect(() => {
-    getRecentSearches().then(setRecentSearches);
-    getFavoriteLocations().then(setFavoriteLocations);
-  }, []);
+    getRecentSearches(user?.id).then(setRecentSearches);
+    getFavoriteLocations(user?.id).then(setFavoriteLocations);
+  }, [user?.id]);
 
   useEffect(() => {
     const normalizedQuery = destination.trim().replace(/\s+/g, " ");
@@ -120,7 +123,7 @@ export default function HomeScreen() {
   }, [currentLocation, destination, destinationCoordinate]);
 
   async function refreshRecentSearches() {
-    const next = await getRecentSearches();
+    const next = await getRecentSearches(user?.id);
     setRecentSearches(next);
   }
 
@@ -171,14 +174,17 @@ export default function HomeScreen() {
     setSuggestions([]);
     setNearbyResults([]);
     setSearchError(null);
-    await saveRecentSearch({
-      id: details.placeId ?? details.id,
-      placeId: details.placeId,
-      label,
-      address,
-      coordinate: details.coordinate,
-      category: details.category
-    });
+    await saveRecentSearch(
+      {
+        id: details.placeId ?? details.id,
+        placeId: details.placeId,
+        label,
+        address,
+        coordinate: details.coordinate,
+        category: details.category
+      },
+      user?.id
+    );
     await refreshRecentSearches();
     const result = await plan(source.trim() || "Current Location", label, preference, {
       source: sourceCoordinate ?? currentLocation,
@@ -267,6 +273,8 @@ export default function HomeScreen() {
     });
     if (result) router.push("/routes");
   }
+  const { width } = useWindowDimensions();
+  const isDesktop = width > 768 || Platform.OS === "web";
 
   async function handleGenerateInsights() {
     if (!routePlan || insightsLoading) return;
@@ -281,124 +289,317 @@ export default function HomeScreen() {
       setInsightsLoading(false);
     }
   }
+  const isFocused = useIsFocused();
+
+  if (!isFocused) return null;
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.background }]}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <View style={[styles.root, { backgroundColor: "transparent" }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          isDesktop ? { paddingTop: 84 } : { paddingTop: spacing.screen },
+          isDesktop && styles.desktopContent
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.header}>
-          <View>
-            <Text style={[styles.logo, { color: theme.text }]}>RoadSense</Text>
-            <Text style={[styles.kicker, { color: theme.primary }]}>AI navigation intelligence</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.logo, { color: theme.primary }]}>
+              Road<Text style={{ color: theme.text }}>Sense</Text>
+            </Text>
+            <Text style={[styles.kicker, { color: theme.secondary }]}>
+              {user ? `Welcome back, ${user.name}` : "AI navigation intelligence"}
+            </Text>
           </View>
-          <Pressable onPress={toggleTheme} style={[styles.themeToggle, { backgroundColor: theme.iconButton, borderColor: theme.border }]}>
-            <MaterialCommunityIcons name={isDark ? "weather-sunny" : "moon-waning-crescent"} size={21} color={theme.text} />
-          </Pressable>
+
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <Pressable
+              onPress={toggleTheme}
+              style={[styles.themeToggle, { backgroundColor: theme.iconButton, borderColor: theme.border }]}
+            >
+              <MaterialCommunityIcons name={isDark ? "weather-sunny" : "moon-waning-crescent"} size={21} color={theme.primary} />
+            </Pressable>
+
+            <Pressable
+              onPress={() => router.push("/(tabs)/profile")}
+              style={[styles.themeToggle, { backgroundColor: theme.chipBackground, borderColor: theme.primary }]}
+            >
+              <MaterialCommunityIcons name={(user?.avatar as any) || "account-circle"} size={22} color={theme.primary} />
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.hero}>
-          <Text style={[styles.title, { color: theme.text }]}>Trip Dashboard</Text>
+          <Text style={[styles.title, { color: theme.text }]}>Trip <Text style={{ color: theme.primary }}>Dashboard</Text></Text>
           <Text style={[styles.subtitle, { color: theme.textSecondary }]}>Plan an optimized journey with real-time safety intelligence.</Text>
         </View>
 
-        <GlassCard>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Route Planner</Text>
-          <Field
-            label="Current Location"
-            value={source}
-            onChangeText={(value) => {
-              setSource(value);
-              setSourceCoordinate(null);
-            }}
-            icon="crosshairs-gps"
-            onPick={() => setPickerTarget("source")}
-          />
-          <SearchBar
-            value={destination}
-            placeholder="Search destination..."
-            loading={searchLoading || detailsLoading}
-            onChangeText={(value) => {
-              setDestination(value);
-              setDestinationCoordinate(null);
-              setFormError(null);
-            }}
-            onClear={() => {
-              setDestination("");
-              setDestinationCoordinate(null);
-              setSuggestions([]);
-              setNearbyResults([]);
-              setActiveCategoryId(null);
-              setSearchError(null);
-            }}
-            onChooseOnMap={() => setPickerTarget("destination")}
-            onSubmit={() => destination.trim() && searchDestination(destination)}
-          />
-          <CategoryChips categories={searchCategories} activeCategoryId={activeCategoryId} onSelect={selectCategory} />
-          {locationNotice ? <Text style={[styles.notice, { color: theme.warning }]}>{locationNotice}</Text> : null}
-          {searchLoading || detailsLoading ? <LoadingSkeleton /> : null}
-          <FavoriteLocations favorites={favoriteLocations} fallbackItems={favoriteFallbacks} onSelect={selectFavoriteLocation} />
-          <RecentSearchList searches={recentSearches} fallbackItems={recentDestinations} onSelect={selectRecentSearch} />
-          <SearchResultsList
-            title={activeCategoryId ? "Nearby Places" : "Suggested Places"}
-            suggestions={suggestions}
-            results={nearbyResults}
-            emptyText={!searchLoading && hasSearched && !suggestions.length && !nearbyResults.length && !searchError ? "No results found. Try a nearby landmark or a more specific place." : undefined}
-            onSelectSuggestion={selectSuggestion}
-            onSelectResult={planSelectedDestination}
-          />
-          <Text style={[styles.smallLabel, { color: theme.textSecondary }]}>Travel Preference</Text>
-          <View style={[styles.segment, { backgroundColor: theme.input }]}>
-            {preferences.map((item) => (
-              <Pressable
-                key={item.value}
-                onPress={() => setPreference(item.value)}
-                style={[styles.segmentItem, preference === item.value && { backgroundColor: theme.chipBackground }]}
-              >
-                <Text style={[styles.segmentText, { color: preference === item.value ? theme.primary : theme.textSecondary }]}>{item.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-          {(formError || error || searchError) ? <Text style={[styles.error, { color: theme.danger }]}>{formError ?? error ?? searchError}</Text> : null}
-          <GradientButton label="Plan Route" loading={loading} onPress={handlePlan} style={styles.cta} />
-          {loading ? <ActivityIndicator color={theme.primary} style={styles.loader} /> : null}
-        </GlassCard>
+        {isDesktop ? (
+          <View style={styles.desktopLayout}>
+            <View style={styles.desktopLeftCol}>
+              <GlassCard>
+                <SectionTitle title="Route Planner" />
+                <Field
+                  label="Current Location"
+                  value={source}
+                  onChangeText={(value) => {
+                    setSource(value);
+                    setSourceCoordinate(null);
+                  }}
+                  icon="crosshairs-gps"
+                  onPick={() => setPickerTarget("source")}
+                />
+                <SearchBar
+                  value={destination}
+                  placeholder="Search destination..."
+                  loading={searchLoading || detailsLoading}
+                  onChangeText={(value) => {
+                    setDestination(value);
+                    setDestinationCoordinate(null);
+                    setFormError(null);
+                  }}
+                  onClear={() => {
+                    setDestination("");
+                    setDestinationCoordinate(null);
+                    setSuggestions([]);
+                    setNearbyResults([]);
+                    setActiveCategoryId(null);
+                    setSearchError(null);
+                  }}
+                  onChooseOnMap={() => setPickerTarget("destination")}
+                  onSubmit={() => destination.trim() && searchDestination(destination)}
+                />
+                <CategoryChips categories={searchCategories} activeCategoryId={activeCategoryId} onSelect={selectCategory} />
+                {locationNotice ? <Text style={[styles.notice, { color: theme.warning }]}>{locationNotice}</Text> : null}
+                {searchLoading || detailsLoading ? <LoadingSkeleton /> : null}
+                <FavoriteLocations favorites={favoriteLocations} fallbackItems={favoriteFallbacks} onSelect={selectFavoriteLocation} />
+                <RecentSearchList searches={recentSearches} fallbackItems={recentDestinations} onSelect={selectRecentSearch} />
+                <SearchResultsList
+                  title={activeCategoryId ? "Nearby Places" : "Suggested Places"}
+                  suggestions={suggestions}
+                  results={nearbyResults}
+                  emptyText={!searchLoading && hasSearched && !suggestions.length && !nearbyResults.length && !searchError ? "No results found. Try a nearby landmark or a more specific place." : undefined}
+                  onSelectSuggestion={selectSuggestion}
+                  onSelectResult={planSelectedDestination}
+                />
+                <Text style={[styles.smallLabel, { color: theme.textSecondary }]}>Travel Preference</Text>
+                <View style={[styles.segment, { backgroundColor: theme.input, borderColor: theme.border }]}>
+                  {preferences.map((item) => (
+                    <Pressable
+                      key={item.value}
+                      onPress={() => setPreference(item.value)}
+                      style={[
+                        styles.segmentItem,
+                        preference === item.value && {
+                          backgroundColor: theme.chipBackground,
+                          borderColor: theme.chipBorder,
+                          borderWidth: 1
+                        }
+                      ]}
+                    >
+                      <Text style={[styles.segmentText, { color: preference === item.value ? theme.primary : theme.textSecondary }]}>{item.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                {(formError || error || searchError) ? <Text style={[styles.error, { color: theme.danger }]}>{formError ?? error ?? searchError}</Text> : null}
+                <GradientButton label="Plan Route" loading={loading} onPress={handlePlan} style={styles.cta} />
+                {loading ? <ActivityIndicator color={theme.primary} style={styles.loader} /> : null}
+              </GlassCard>
 
-        <SectionHeader title="Recent Destinations" />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {recentDestinations.map((item) => (
-            <AIChip key={item} label={item} onPress={() => setDestination(item)} />
-          ))}
-        </ScrollView>
+              <SectionHeader title="AI Insights" />
+              <GlassCard>
+                {displayedInsights.map((insight) => (
+                  <View key={insight} style={styles.insight}>
+                    <View style={[styles.insightDot, { backgroundColor: theme.primary }]} />
+                    <Text style={[styles.insightText, { color: theme.textSecondary }]}>{insight}</Text>
+                  </View>
+                ))}
+                {insightsError ? <Text style={[styles.error, { color: theme.danger }]}>{insightsError}</Text> : null}
+                <GradientButton
+                  label="Generate AI Analysis"
+                  icon="creation"
+                  loading={insightsLoading}
+                  loadingLabel="Generating..."
+                  onPress={handleGenerateInsights}
+                  style={styles.insightButton}
+                />
+              </GlassCard>
 
-        <SectionHeader title="Map Preview" />
-        <MapPreview plan={routePlan} />
-
-        <SectionHeader title="AI Insights" />
-        <GlassCard>
-          {displayedInsights.map((insight) => (
-            <View key={insight} style={styles.insight}>
-              <MaterialCommunityIcons name="star-four-points" size={16} color={theme.primary} />
-              <Text style={[styles.insightText, { color: theme.textSecondary }]}>{insight}</Text>
+              <SectionHeader title="Live Hazards" />
+              <GlassCard>
+                <View style={styles.emptyState}>
+                  <View style={[styles.emptyIconWrap, { backgroundColor: "rgba(57,255,20,0.10)", borderColor: "rgba(57,255,20,0.3)" }]}>
+                    <MaterialCommunityIcons name="shield-check-outline" size={26} color={theme.success} />
+                  </View>
+                  <Text style={[styles.emptyTitle, { color: theme.text }]}>No hazards detected along current route</Text>
+                  <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                    All live sensors report optimal driving safety. Clear weather and road conditions ahead.
+                  </Text>
+                </View>
+              </GlassCard>
             </View>
-          ))}
-          {insightsError ? <Text style={[styles.error, { color: theme.danger }]}>{insightsError}</Text> : null}
-          <GradientButton
-            label="Generate AI Analysis"
-            icon="creation"
-            loading={insightsLoading}
-            loadingLabel="Generating..."
-            onPress={handleGenerateInsights}
-            style={styles.insightButton}
-          />
-        </GlassCard>
 
-        <SectionHeader title="Live Hazards" />
-        <GlassCard>
-          <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="shield-check-outline" size={24} color={theme.success} />
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>No current hazards reported</Text>
-            <Text style={[styles.emptyText, { color: theme.textSecondary }]}>Live traffic incident data is not connected yet. Route, weather, and map data are active.</Text>
+            <View style={styles.desktopRightCol}>
+              <GlassCard style={{ flex: 1, minHeight: 620, padding: 12 }}>
+                <SectionTitle title="Interactive Route Map" />
+                <View style={{ flex: 1, minHeight: 480, borderRadius: 16, overflow: "hidden" }}>
+                  <MapPreview plan={routePlan} />
+                </View>
+                {routePlan ? (
+                  <GradientButton
+                    label="Open Navigation in Google Maps"
+                    icon="google-maps"
+                    onPress={async () => {
+                      const origin = `${routePlan.sourceCoordinate.latitude},${routePlan.sourceCoordinate.longitude}`;
+                      const destination = `${routePlan.destinationCoordinate.latitude},${routePlan.destinationCoordinate.longitude}`;
+                      const selRoute = routePlan.routes[0];
+                      let waypointsParam = "";
+                      if (selRoute && selRoute.coordinates && selRoute.coordinates.length >= 6) {
+                        const coords = selRoute.coordinates;
+                        const p1 = coords[Math.floor(coords.length * 0.25)];
+                        const p2 = coords[Math.floor(coords.length * 0.50)];
+                        const p3 = coords[Math.floor(coords.length * 0.75)];
+                        const wpStr = `${p1.latitude.toFixed(6)},${p1.longitude.toFixed(6)}|${p2.latitude.toFixed(6)},${p2.longitude.toFixed(6)}|${p3.latitude.toFixed(6)},${p3.longitude.toFixed(6)}`;
+                        waypointsParam = `&waypoints=${encodeURIComponent(wpStr)}`;
+                      }
+                      const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}${waypointsParam}&travelmode=driving`;
+                      await Linking.openURL(url);
+                    }}
+                    style={{ marginTop: 14 }}
+                  />
+                ) : null}
+              </GlassCard>
+            </View>
           </View>
-        </GlassCard>
+        ) : (
+          <>
+            <GlassCard>
+              <SectionTitle title="Route Planner" />
+              <Field
+                label="Current Location"
+                value={source}
+                onChangeText={(value) => {
+                  setSource(value);
+                  setSourceCoordinate(null);
+                }}
+                icon="crosshairs-gps"
+                onPick={() => setPickerTarget("source")}
+              />
+              <SearchBar
+                value={destination}
+                placeholder="Search destination..."
+                loading={searchLoading || detailsLoading}
+                onChangeText={(value) => {
+                  setDestination(value);
+                  setDestinationCoordinate(null);
+                  setFormError(null);
+                }}
+                onClear={() => {
+                  setDestination("");
+                  setDestinationCoordinate(null);
+                  setSuggestions([]);
+                  setNearbyResults([]);
+                  setActiveCategoryId(null);
+                  setSearchError(null);
+                }}
+                onChooseOnMap={() => setPickerTarget("destination")}
+                onSubmit={() => destination.trim() && searchDestination(destination)}
+              />
+              <CategoryChips categories={searchCategories} activeCategoryId={activeCategoryId} onSelect={selectCategory} />
+              {locationNotice ? <Text style={[styles.notice, { color: theme.warning }]}>{locationNotice}</Text> : null}
+              {searchLoading || detailsLoading ? <LoadingSkeleton /> : null}
+              <FavoriteLocations favorites={favoriteLocations} fallbackItems={favoriteFallbacks} onSelect={selectFavoriteLocation} />
+              <RecentSearchList searches={recentSearches} fallbackItems={recentDestinations} onSelect={selectRecentSearch} />
+              <SearchResultsList
+                title={activeCategoryId ? "Nearby Places" : "Suggested Places"}
+                suggestions={suggestions}
+                results={nearbyResults}
+                emptyText={!searchLoading && hasSearched && !suggestions.length && !nearbyResults.length && !searchError ? "No results found. Try a nearby landmark or a more specific place." : undefined}
+                onSelectSuggestion={selectSuggestion}
+                onSelectResult={planSelectedDestination}
+              />
+              <Text style={[styles.smallLabel, { color: theme.textSecondary }]}>Travel Preference</Text>
+              <View style={[styles.segment, { backgroundColor: theme.input, borderColor: theme.border }]}>
+                {preferences.map((item) => (
+                  <Pressable
+                    key={item.value}
+                    onPress={() => setPreference(item.value)}
+                    style={[
+                      styles.segmentItem,
+                      preference === item.value && {
+                        backgroundColor: theme.chipBackground,
+                        borderColor: theme.chipBorder,
+                        borderWidth: 1
+                      }
+                    ]}
+                  >
+                    <Text style={[styles.segmentText, { color: preference === item.value ? theme.primary : theme.textSecondary }]}>{item.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              {(formError || error || searchError) ? <Text style={[styles.error, { color: theme.danger }]}>{formError ?? error ?? searchError}</Text> : null}
+              <GradientButton label="Plan Route" loading={loading} onPress={handlePlan} style={styles.cta} />
+              {loading ? <ActivityIndicator color={theme.primary} style={styles.loader} /> : null}
+            </GlassCard>
+
+            <SectionHeader title="Map Preview" />
+            <MapPreview plan={routePlan} />
+            {routePlan ? (
+              <GradientButton
+                label="Open Navigation in Google Maps"
+                icon="google-maps"
+                onPress={async () => {
+                  const origin = `${routePlan.sourceCoordinate.latitude},${routePlan.sourceCoordinate.longitude}`;
+                  const destination = `${routePlan.destinationCoordinate.latitude},${routePlan.destinationCoordinate.longitude}`;
+                  const selRoute = routePlan.routes[0];
+                  let waypointsParam = "";
+                  if (selRoute && selRoute.coordinates && selRoute.coordinates.length >= 6) {
+                    const coords = selRoute.coordinates;
+                    const p1 = coords[Math.floor(coords.length * 0.25)];
+                    const p2 = coords[Math.floor(coords.length * 0.50)];
+                    const p3 = coords[Math.floor(coords.length * 0.75)];
+                    const wpStr = `${p1.latitude.toFixed(6)},${p1.longitude.toFixed(6)}|${p2.latitude.toFixed(6)},${p2.longitude.toFixed(6)}|${p3.latitude.toFixed(6)},${p3.longitude.toFixed(6)}`;
+                    waypointsParam = `&waypoints=${encodeURIComponent(wpStr)}`;
+                  }
+                  const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}${waypointsParam}&travelmode=driving`;
+                  await Linking.openURL(url);
+                }}
+                style={{ marginTop: 12 }}
+              />
+            ) : null}
+
+            <SectionHeader title="AI Insights" />
+            <GlassCard>
+              {displayedInsights.map((insight) => (
+                <View key={insight} style={styles.insight}>
+                  <View style={[styles.insightDot, { backgroundColor: theme.primary }]} />
+                  <Text style={[styles.insightText, { color: theme.textSecondary }]}>{insight}</Text>
+                </View>
+              ))}
+              {insightsError ? <Text style={[styles.error, { color: theme.danger }]}>{insightsError}</Text> : null}
+              <GradientButton
+                label="Generate AI Analysis"
+                icon="creation"
+                loading={insightsLoading}
+                loadingLabel="Generating..."
+                onPress={handleGenerateInsights}
+                style={styles.insightButton}
+              />
+            </GlassCard>
+
+            <SectionHeader title="Live Hazards" />
+            <GlassCard>
+              <View style={styles.emptyState}>
+                <View style={[styles.emptyIconWrap, { backgroundColor: "rgba(57,255,20,0.10)", borderColor: "rgba(57,255,20,0.3)" }]}>
+                  <MaterialCommunityIcons name="shield-check-outline" size={26} color={theme.success} />
+                </View>
+                <Text style={[styles.emptyTitle, { color: theme.text }]}>No current hazards reported</Text>
+                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>Traffic incident feeds are not connected in this MVP.</Text>
+              </View>
+            </GlassCard>
+          </>
+        )}
 
         <SectionHeader title="Weekly Stats" />
         <View style={styles.grid}>
@@ -454,7 +655,7 @@ function Field({
   const { theme } = useTheme();
 
   return (
-    <View style={[styles.field, { backgroundColor: theme.input }]}>
+    <View style={[styles.field, { backgroundColor: theme.input, borderColor: theme.border }]}>
       <MaterialCommunityIcons name={icon as any} size={20} color={theme.primary} />
       <TextInput
         placeholder={label}
@@ -463,46 +664,102 @@ function Field({
         onChangeText={onChangeText}
         style={[styles.input, { color: theme.text }]}
       />
-      <Pressable onPress={onPick} style={[styles.pickButton, { backgroundColor: theme.chipBackground }]}>
-        <MaterialCommunityIcons name="map-search-outline" size={20} color={theme.text} />
+      <Pressable onPress={onPick} style={[styles.pickButton, { backgroundColor: theme.chipBackground, borderColor: theme.chipBorder, borderWidth: 1 }]}>
+        <MaterialCommunityIcons name="map-search-outline" size={20} color={theme.primary} />
       </Pressable>
+    </View>
+  );
+}
+
+function SectionTitle({ title }: { title: string }) {
+  const { theme } = useTheme();
+  return (
+    <View style={styles.sectionTitleWrap}>
+      <View style={[styles.sectionTitleBar, { backgroundColor: theme.primary }]} />
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
     </View>
   );
 }
 
 function SectionHeader({ title }: { title: string }) {
   const { theme } = useTheme();
-  return <Text style={[styles.sectionHeader, { color: theme.text }]}>{title}</Text>;
+  return (
+    <View style={styles.sectionHeaderWrap}>
+      <Text style={[styles.sectionHeader, { color: theme.text }]}>{title}</Text>
+      <View style={[styles.sectionHeaderLine, { backgroundColor: theme.primary }]} />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { padding: spacing.screen, paddingBottom: 128 },
+  content: { padding: 16, paddingBottom: 128 },
+  desktopContent: {
+    paddingTop: 80,
+    paddingHorizontal: 32,
+    maxWidth: 1440,
+    alignSelf: "center",
+    width: "100%"
+  },
+  desktopLayout: {
+    flexDirection: "row",
+    gap: 24,
+    alignItems: "flex-start",
+    marginTop: 10
+  },
+  desktopLeftCol: { width: 440 },
+  desktopRightCol: { flex: 1 },
   header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingTop: 18 },
-  themeToggle: { alignItems: "center", borderRadius: 18, borderWidth: 1, height: 42, justifyContent: "center", width: 42 },
-  logo: { fontSize: 24, fontWeight: "900" },
-  kicker: { fontSize: 12, marginTop: 3 },
+  themeToggle: {
+    alignItems: "center", borderRadius: 18, borderWidth: 1,
+    height: 44, justifyContent: "center", width: 44
+  },
+  logo: { fontSize: 26, fontWeight: "900", letterSpacing: 0.5 },
+  kicker: { fontSize: 12, marginTop: 3, letterSpacing: 0.4 },
   hero: { marginVertical: 24 },
-  title: { fontSize: 36, fontWeight: "900", letterSpacing: 0 },
-  subtitle: { fontSize: 16, lineHeight: 23, marginTop: 8 },
-  sectionTitle: { fontSize: 18, fontWeight: "900", marginBottom: 14 },
-  field: { alignItems: "center", borderRadius: 18, flexDirection: "row", gap: 10, marginBottom: 12, paddingHorizontal: 14 },
+  title: { fontSize: 36, fontWeight: "900", letterSpacing: -0.5 },
+  subtitle: { fontSize: 15, lineHeight: 23, marginTop: 8 },
+
+  // Section title inside card
+  sectionTitleWrap: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 16 },
+  sectionTitleBar: { width: 4, height: 20, borderRadius: 2 },
+  sectionTitle: { fontSize: 18, fontWeight: "900" },
+
+  // Section header between cards
+  sectionHeaderWrap: { marginTop: 24, marginBottom: 12, gap: 6 },
+  sectionHeader: { fontSize: 20, fontWeight: "900" },
+  sectionHeaderLine: { height: 2, width: 36, borderRadius: 2, opacity: 0.7 },
+
+  field: {
+    alignItems: "center", borderRadius: 18, borderWidth: 1,
+    flexDirection: "row", gap: 10, marginBottom: 12, paddingHorizontal: 14
+  },
   input: { flex: 1, fontSize: 15, minHeight: 54 },
-  pickButton: { alignItems: "center", borderRadius: 14, height: 38, justifyContent: "center", width: 38 },
-  smallLabel: { fontSize: 12, fontWeight: "700", marginBottom: 10, marginTop: 2 },
+  pickButton: {
+    alignItems: "center", borderRadius: 14, height: 38,
+    justifyContent: "center", width: 38
+  },
+  smallLabel: { fontSize: 12, fontWeight: "700", marginBottom: 10, marginTop: 4 },
   notice: { fontSize: 12, lineHeight: 18, marginTop: 10 },
-  segment: { borderRadius: 18, flexDirection: "row", padding: 4 },
-  segmentItem: { alignItems: "center", borderRadius: 15, flex: 1, paddingVertical: 12 },
-  segmentText: { fontWeight: "800" },
+  segment: {
+    borderRadius: 18, borderWidth: 1,
+    flexDirection: "row", padding: 4, marginBottom: 4
+  },
+  segmentItem: { alignItems: "center", borderRadius: 15, flex: 1, paddingVertical: 12, borderColor: "transparent" },
+  segmentText: { fontWeight: "800", fontSize: 13 },
   cta: { marginTop: 16 },
   loader: { marginTop: 12 },
-  error: { marginTop: 12 },
-  sectionHeader: { fontSize: 20, fontWeight: "900", marginBottom: 12, marginTop: 24 },
-  insight: { alignItems: "center", flexDirection: "row", gap: 10, marginBottom: 12 },
-  insightText: { flex: 1, lineHeight: 20 },
-  insightButton: { marginTop: 6 },
-  emptyState: { alignItems: "center", gap: 8, paddingVertical: 8 },
+  error: { marginTop: 12, fontSize: 13 },
+  insight: { alignItems: "flex-start", flexDirection: "row", gap: 10, marginBottom: 14 },
+  insightDot: { width: 8, height: 8, borderRadius: 4, marginTop: 6, flexShrink: 0 },
+  insightText: { flex: 1, lineHeight: 21, fontSize: 13 },
+  insightButton: { marginTop: 8 },
+  emptyState: { alignItems: "center", gap: 10, paddingVertical: 10 },
+  emptyIconWrap: {
+    alignItems: "center", borderRadius: 24, borderWidth: 1,
+    height: 52, justifyContent: "center", width: 52
+  },
   emptyTitle: { fontSize: 16, fontWeight: "900" },
-  emptyText: { lineHeight: 20, textAlign: "center" },
+  emptyText: { lineHeight: 20, textAlign: "center", fontSize: 13 },
   grid: { flexDirection: "row", gap: 12, marginBottom: 12 }
 });

@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ChatMessage } from "../types/chat";
 import { RoutePlan, TravelPreference } from "../types/route";
+import { apiService } from "./apiService";
 
 const keys = {
   recentDestinations: "roadsense:recent-destinations",
@@ -71,10 +72,45 @@ export const storageService = {
   },
   getRoutePlan: () => readJson<RoutePlan | null>(keys.routePlan, null),
   saveRoutePlan: (plan: RoutePlan | null) => writeJson(keys.routePlan, plan),
-  getTripStats: () => readJson<LocalTripStats>(keys.stats, defaultTripStats),
-  async recordPlannedTrip(plan: RoutePlan) {
-    const current = await storageService.getTripStats();
+
+  async getTripStats(userId?: string): Promise<LocalTripStats> {
+    if (userId) {
+      try {
+        const stats = await apiService.fetchTripStats(userId);
+        if (stats) return stats;
+      } catch (err) {
+        console.info("[Storage] DB stats fetch offline, using user-scoped local storage.");
+      }
+    }
+    const userKey = userId ? `${keys.stats}:${userId}` : keys.stats;
+    return readJson<LocalTripStats>(userKey, defaultTripStats);
+  },
+
+  async recordPlannedTrip(plan: RoutePlan, userId?: string) {
     const bestRoute = plan.routes[0];
+
+    // Attempt DB record save
+    if (userId) {
+      try {
+        await apiService.saveTripHistory(userId, {
+          sourceName: plan.source || "Current Location",
+          destinationName: plan.destination || "Destination",
+          sourceLat: plan.sourceCoordinate?.latitude || 0,
+          sourceLng: plan.sourceCoordinate?.longitude || 0,
+          destLat: plan.destinationCoordinate?.latitude || 0,
+          destLng: plan.destinationCoordinate?.longitude || 0,
+          distanceKm: bestRoute.distance,
+          etaMinutes: bestRoute.eta,
+          fuelCost: bestRoute.fuelCost,
+          safetyScore: bestRoute.safetyScore,
+          preferredRouteType: plan.preference || "safest"
+        });
+      } catch (err) {
+        console.info("[Storage] Save trip to DB offline, updating local stats.");
+      }
+    }
+
+    const current = await this.getTripStats(userId);
     const next: LocalTripStats = {
       plannedTrips: current.plannedTrips + 1,
       totalDistance: current.totalDistance + bestRoute.distance,
@@ -84,13 +120,50 @@ export const storageService = {
       bestSafetyScore: Math.max(current.bestSafetyScore, bestRoute.safetyScore),
       lastUpdated: Date.now()
     };
-    await writeJson(keys.stats, next);
+
+    const userKey = userId ? `${keys.stats}:${userId}` : keys.stats;
+    await writeJson(userKey, next);
   },
-  getPreferences: () => readJson<UserPreferences>(keys.preferences, defaultPreferences),
-  savePreferences: (preferences: UserPreferences) => writeJson(keys.preferences, preferences),
-  getChatHistory: () => readJson<ChatMessage[]>(keys.chat, []),
-  saveChatHistory: (messages: ChatMessage[]) => writeJson(keys.chat, messages.slice(-40)),
-  clearChatHistory: () => AsyncStorage.removeItem(keys.chat).catch((error) => {
-    console.warn("[RoadSense Storage] Chat clear failed", error);
-  })
+
+  async getPreferences(userId?: string): Promise<UserPreferences> {
+    const userKey = userId ? `${keys.preferences}:${userId}` : keys.preferences;
+    return readJson<UserPreferences>(userKey, defaultPreferences);
+  },
+
+  async savePreferences(preferences: UserPreferences, userId?: string) {
+    const userKey = userId ? `${keys.preferences}:${userId}` : keys.preferences;
+    await writeJson(userKey, preferences);
+  },
+
+  async getChatHistory(userId?: string): Promise<ChatMessage[]> {
+    if (userId) {
+      try {
+        const messages = await apiService.fetchChatHistory(userId);
+        if (messages && messages.length > 0) return messages;
+      } catch (err) {
+        console.info("[Storage] DB chat fetch offline, using local storage.");
+      }
+    }
+    const userKey = userId ? `${keys.chat}:${userId}` : keys.chat;
+    return readJson<ChatMessage[]>(userKey, []);
+  },
+
+  async saveChatHistory(messages: ChatMessage[], userId?: string) {
+    const userKey = userId ? `${keys.chat}:${userId}` : keys.chat;
+    await writeJson(userKey, messages.slice(-40));
+  },
+
+  async clearChatHistory(userId?: string) {
+    if (userId) {
+      try {
+        await apiService.clearChatHistory(userId);
+      } catch (err) {
+        console.info("[Storage] DB chat clear offline.");
+      }
+    }
+    const userKey = userId ? `${keys.chat}:${userId}` : keys.chat;
+    await AsyncStorage.removeItem(userKey).catch((error) => {
+      console.warn("[RoadSense Storage] Chat clear failed", error);
+    });
+  }
 };

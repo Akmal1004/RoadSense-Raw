@@ -14,8 +14,16 @@ export default function StatCard({ label, value, icon }: Props) {
 
   return (
     <GlassCard style={styles.card}>
-      <View style={[styles.iconWrap, { backgroundColor: theme.chipBackground }]}>
-        <MaterialCommunityIcons name={icon as any} size={20} color={theme.primary} />
+      {/* Left accent stripe */}
+      <View style={[styles.accentStripe, { backgroundColor: theme.primary }]} />
+
+      <View style={[styles.iconWrap, { backgroundColor: theme.chipBackground, borderColor: theme.chipBorder }]}>
+        <MaterialCommunityIcons
+          name={icon as any}
+          size={22}
+          color={theme.primary}
+          style={{ textShadowColor: theme.primary, textShadowRadius: 8 } as any}
+        />
       </View>
       <Text style={[styles.value, { color: theme.text }]}>{value}</Text>
       <Text style={[styles.label, { color: theme.textSecondary }]}>{label}</Text>
@@ -26,22 +34,36 @@ export default function StatCard({ label, value, icon }: Props) {
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    minHeight: 118
+    minHeight: 130,
+    paddingLeft: 22
+  },
+  accentStripe: {
+    position: "absolute",
+    top: 16,
+    bottom: 16,
+    left: 0,
+    width: 3,
+    borderRadius: 3,
+    opacity: 0.85
   },
   iconWrap: {
     alignItems: "center",
     borderRadius: 16,
-    height: 36,
+    borderWidth: 1,
+    height: 44,
     justifyContent: "center",
-    width: 36
+    width: 44
   },
   value: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "900",
-    marginTop: 14
+    marginTop: 14,
+    letterSpacing: -0.5
   },
   label: {
     fontSize: 12,
-    marginTop: 4
+    marginTop: 3,
+    fontWeight: "600",
+    letterSpacing: 0.3
   }
 });
