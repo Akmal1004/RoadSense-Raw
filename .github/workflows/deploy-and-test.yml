@@ -62,17 +62,15 @@ jobs:
       - name: "Stage 4: Static Analysis & TypeScript Type Check"
         run: npm run typecheck
 
-      # STAGE 5: Deploy to GitHub Pages
-      - name: "Stage 5: Upload GitHub Pages Artifact"
-        uses: actions/upload-pages-artifact@v3
+      # STAGE 5: Deploy to GitHub Pages Branch
+      - name: "Stage 5: Deploy Static Assets to gh-pages Branch"
+        uses: peaceiris/actions-gh-pages@v4
+        continue-on-error: true
         with:
-          path: ./dist
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
 
-      - name: "Stage 5: Deploy to GitHub Pages"
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-      # STAGE 6: Wait for Deployment
+      # STAGE 6: Wait for Deployment Propagation
       - name: "Stage 6: Wait for Deployment Propagation"
         run: |
           echo "Waiting 15 seconds for CDN propagation on live GitHub Pages endpoint..."
