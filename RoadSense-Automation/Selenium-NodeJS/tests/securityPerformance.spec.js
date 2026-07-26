@@ -5,7 +5,7 @@ describe("Web Security, Performance & Advanced Quality Test Suite [Selenium Node
   this.timeout(60000);
 
   // --------------------------------------------------------------------------
-  # Security Test Cases (WEB-SEC-001 to WEB-SEC-025)
+  // Security Test Cases (WEB-SEC-001 to WEB-SEC-025)
   // --------------------------------------------------------------------------
 
   it("WEB-SEC-001: SQL Injection Payload in Search Form Sanitized Without Error @security", async function () {
@@ -159,7 +159,7 @@ describe("Web Security, Performance & Advanced Quality Test Suite [Selenium Node
   });
 
   // --------------------------------------------------------------------------
-  # Performance & Web Quality Test Cases (WEB-PERF-001 to WEB-PERF-025)
+  // Performance & Web Quality Test Cases (WEB-PERF-001 to WEB-PERF-025)
   // --------------------------------------------------------------------------
 
   it("WEB-PERF-001: First Contentful Paint (FCP) Benchmark Stays Below 1.2s @performance", async function () {
