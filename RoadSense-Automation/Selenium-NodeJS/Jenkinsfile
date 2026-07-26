@@ -1,0 +1,44 @@
+pipeline {
+    agent any
+
+    environment {
+        NODE_ENV = 'production'
+        BASE_URL = 'http://localhost:8082'
+        BROWSER = 'chrome'
+        HEADLESS = 'true'
+    }
+
+    stages {
+        stage('Checkout Source') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Install Node Dependencies') {
+            steps {
+                sh 'npm ci'
+            }
+        }
+
+        stage('Run Selenium Web Tests') {
+            steps {
+                sh 'npm test'
+            }
+        }
+
+        stage('Generate Mochawesome & Allure Reports') {
+            steps {
+                sh 'npm run report:mochawesome'
+                allure includeProperties: false, jdk: '', results: [[path: 'reports/allure-results']]
+                publishHTML([allowMissing: false, alwaysLinkToLastBuild: true, keepAll: true, reportDir: 'reports', reportFiles: 'selenium_report.html', reportName: 'Selenium Web Execution Report'])
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

@@ -1,0 +1,49 @@
+pipeline {
+    agent any
+
+    environment {
+        PYTHON_ENV = 'venv'
+        APPIUM_SERVER_URL = 'http://localhost:4723'
+    }
+
+    stages {
+        stage('Checkout Source') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Setup Python Environment') {
+            steps {
+                sh '''
+                    python3 -m venv ${PYTHON_ENV}
+                    . ${PYTHON_ENV}/bin/activate
+                    pip install --upgrade pip
+                    pip install -r requirements.txt
+                '''
+            }
+        }
+
+        stage('Run Appium Tests') {
+            steps {
+                sh '''
+                    . ${PYTHON_ENV}/bin/activate
+                    pytest -v --html=reports/html_report.html --alluredir=reports/allure-results
+                '''
+            }
+        }
+
+        stage('Generate Reports') {
+            steps {
+                allure includeProperties: false, jdk: '', results: [[path: 'reports/allure-results']]
+                publishHTML([allowMissing: false, alwaysLinkToLastBuild: true, keepAll: true, reportDir: 'reports', reportFiles: 'html_report.html', reportName: 'Appium Execution Report'])
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

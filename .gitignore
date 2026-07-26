@@ -30,3 +30,9 @@ android/app/debug.keystore
 
 expo-env.d.ts
 # @end expo-cli
+
+# Test Execution Output Artifacts
+Test Results/
+.historical_reports/
+.pytest_cache/
+
