@@ -64,6 +64,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [appium-mobile-automation, selenium-web-automation]
     if: always()
+    env:
+      PYTHONPATH: "."
+      BASE_URL: "https://akmal1004.github.io/RoadSense-Raw/"
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -80,17 +83,14 @@ jobs:
 
       - name: Generate 300+ Test Cases Excel Workbooks
         run: |
-          python automation/utils/generate_excel_report_300.py
+          python -m automation.utils.generate_excel_report_300
 
       - name: Upload 300+ Test Cases Excel Sheet Artifact
         uses: actions/upload-artifact@v4
         with:
           name: RoadSense-Excel-Report-300-Test-Cases
           path: |
-            Test Results/Excel/
-            Test Results/Summary/
-            Test Results/JSON/
-            Test Results/HTML/
+            Test Results/
           retention-days: 30
 
       - name: Publish Action Execution Step Summary
