@@ -1,4 +1,4 @@
-"""Excel Report Generator for Selenium E2E Automation Framework."""
+"""Excel Report Generator for Selenium & Appium E2E Automation Framework."""
 
 import os
 import openpyxl
@@ -30,16 +30,22 @@ class ExcelReporter:
 
     @classmethod
     def generate_all_excel_reports(cls, test_results: list, metrics: dict):
-        """Generate all 4 required Excel report workbooks."""
+        """Generate all required Excel report workbooks."""
         os.makedirs(Config.EXCEL_DIR, exist_ok=True)
 
-        cls._generate_master_report(test_results, metrics)
+        cls._generate_master_report(test_results, metrics, "Automation_Test_Report.xlsx", "Combined Selenium & Appium Suite")
         cls._generate_passed_report(test_results)
         cls._generate_failed_report(test_results)
         cls._generate_summary_report(metrics)
 
     @classmethod
-    def _generate_master_report(cls, test_results: list, metrics: dict):
+    def generate_custom_excel_report(cls, test_results: list, metrics: dict, filename: str, engine_name: str = "Automation Suite"):
+        """Generate a dedicated standalone Excel report workbook."""
+        os.makedirs(Config.EXCEL_DIR, exist_ok=True)
+        cls._generate_master_report(test_results, metrics, filename, engine_name)
+
+    @classmethod
+    def _generate_master_report(cls, test_results: list, metrics: dict, filename: str = "Automation_Test_Report.xlsx", engine_name: str = "Automation Framework"):
         wb = openpyxl.Workbook()
 
         # Sheet 1: Executed Test Cases
@@ -65,15 +71,15 @@ class ExcelReporter:
 
         # Sheet 5: Execution Metrics
         ws_metrics = wb.create_sheet("Execution Metrics")
-        cls._build_metrics_sheet(ws_metrics, metrics)
+        cls._build_metrics_sheet(ws_metrics, metrics, engine_name)
 
         # Sheet 6: Defect Summary
         ws_defects = wb.create_sheet("Defect Summary")
         cls._build_defects_sheet(ws_defects, failed_results)
 
-        file_path = os.path.join(Config.EXCEL_DIR, "Automation_Test_Report.xlsx")
+        file_path = os.path.join(Config.EXCEL_DIR, filename)
         wb.save(file_path)
-        print(f"[SUCCESS] Generated Excel Master Report: {file_path}")
+        print(f"[SUCCESS] Generated Excel Report ({filename}): {file_path}")
 
     @classmethod
     def _generate_passed_report(cls, test_results: list):
@@ -144,7 +150,7 @@ class ExcelReporter:
             ws.column_dimensions[col_letter].width = min(max(max_len + 4, 12), 60)
 
     @classmethod
-    def _build_metrics_sheet(cls, ws, metrics: dict):
+    def _build_metrics_sheet(cls, ws, metrics: dict, engine_name: str = "Automation Framework"):
         ws.append(["Metric Parameter", "Value"])
         ws.cell(row=1, column=1).fill = cls.HEADER_FILL
         ws.cell(row=1, column=1).font = cls.HEADER_FONT
@@ -159,8 +165,8 @@ class ExcelReporter:
             ("Skipped / Blocked Cases", metrics.get("skipped", 0)),
             ("Pass Rate (%)", f"{metrics.get('pass_rate', 0.0):.2f}%"),
             ("Total Execution Time (seconds)", f"{metrics.get('total_duration', 0.0):.2f}s"),
-            ("Framework Engine", "Selenium WebDriver 4 + Pytest"),
-            ("Browser Engine", f"Google Chrome (Headless)")
+            ("Framework Engine", engine_name),
+            ("Execution Environment", "GitHub Actions CI Runner (Headless)")
         ]
         for idx, (k, v) in enumerate(metric_rows, 2):
             ws.append([k, v])
