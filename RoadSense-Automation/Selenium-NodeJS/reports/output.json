@@ -1,24 +1,22 @@
 {
   "stats": {
-    "suites": 12,
-    "tests": 350,
-    "passes": 350,
+    "suites": 0,
+    "tests": 0,
+    "passes": 0,
     "pending": 0,
     "failures": 0,
-    "start": "2026-07-27T16:08:11.668Z",
-    "end": "2026-07-27T16:08:14.111Z",
-    "duration": 2443,
     "testsRegistered": 0,
     "passPercent": null,
     "pendingPercent": null,
     "other": 0,
     "hasOther": false,
     "skipped": 0,
-    "hasSkipped": false
+    "hasSkipped": false,
+    "start": "2026-07-27T16:08:11.668Z",
+    "end": "2026-07-27T16:08:14.111Z",
+    "duration": 2443
   },
-  "results": [
-    false
-  ],
+  "results": [],
   "meta": {
     "mocha": {
       "version": "10.8.2"
