@@ -1,4 +1,4 @@
-name: RoadSense Enterprise Automation CI
+name: RoadSense Enterprise Unified Automation CI
 
 on:
   push:
@@ -8,12 +8,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   actions: write
+  pages: write
 
 jobs:
-  appium-python-tests:
-    name: Appium Python Mobile Automation
+  appium-mobile-automation:
+    name: Appium Python Mobile Automation Suite
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -36,8 +37,8 @@ jobs:
           cd RoadSense-Automation/Appium-Python
           pytest --collect-only
 
-  selenium-nodejs-tests:
-    name: Selenium Node.js Web Automation
+  selenium-web-automation:
+    name: Selenium Node.js Web Automation Suite
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -61,7 +62,7 @@ jobs:
   generate-excel-report-300-tests:
     name: Generate & Upload 300+ Test Cases Excel Sheet Report
     runs-on: ubuntu-latest
-    needs: [appium-python-tests, selenium-nodejs-tests]
+    needs: [appium-mobile-automation, selenium-web-automation]
     if: always()
     steps:
       - name: Checkout Code
