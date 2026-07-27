@@ -60,7 +60,7 @@ jobs:
           npm test
 
   generate-excel-report-300-tests:
-    name: Generate & Upload 300+ Test Cases Excel Sheet Report
+    name: Generate & Upload 300+ Test Cases & Load Test Excel Report
     runs-on: ubuntu-latest
     needs: [appium-mobile-automation, selenium-web-automation]
     if: always()
@@ -81,11 +81,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install openpyxl jinja2 requests pytest
 
+      - name: Execute Baseline Load Test (100 Virtual Users / 1 Minute)
+        run: |
+          python -m automation.utils.load_test_runner || true
+
       - name: Generate 300+ Test Cases Excel Workbooks
         run: |
           python -m automation.utils.generate_excel_report_300
 
-      - name: Upload 300+ Test Cases Excel Sheet Artifact
+      - name: Upload 300+ Test Cases & Load Test Excel Artifact
         uses: actions/upload-artifact@v4
         with:
           name: RoadSense-Excel-Report-300-Test-Cases
