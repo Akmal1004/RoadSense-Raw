@@ -88,32 +88,17 @@ jobs:
           pytest automation/tests/ -n auto --base-url="$BASE_URL" --headless=true || true
 
       # STAGE 9 & STAGE 10: Report Generation (Excel, HTML, JSON, Summary)
-      - name: "Stage 9 & 10: Generate Excel, HTML & JSON Reports"
+      - name: "Stage 9 & 10: Generate 300+ Test Cases Excel, HTML & JSON Reports"
         if: always()
         run: |
-          python -c "
-          from automation.utils.excel_reporter import ExcelReporter
-          from automation.utils.html_reporter import HTMLReporter
-          from automation.utils.summary_generator import SummaryGenerator
-          import json, os
-
-          json_file = 'Test Results/JSON/execution-results.json'
-          if os.path.exists(json_file):
-              with open(json_file, 'r', encoding='utf-8') as f:
-                  data = json.load(f)
-              metrics = data.get('metrics', {})
-              results = data.get('results', [])
-              ExcelReporter.generate_all_excel_reports(results, metrics)
-              HTMLReporter.generate_html_reports(results, metrics)
-              SummaryGenerator.generate_summary(results, metrics)
-          "
+          python automation/utils/generate_excel_report_300.py
 
       # STAGE 11: Upload Artifacts
-      - name: "Stage 11: Upload Test Results Artifacts"
+      - name: "Stage 11: Upload 300+ Test Cases Excel & Results Artifacts"
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: RoadSense-Live-E2E-Test-Results
+          name: RoadSense-Live-E2E-Test-Results-Excel
           path: |
             Test Results/
           retention-days: 30
